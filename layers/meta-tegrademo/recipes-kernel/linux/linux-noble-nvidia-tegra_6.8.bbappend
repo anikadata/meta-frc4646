@@ -1,4 +1,4 @@
-FILESEXTRAPATHS:prepend := "${THISDIR}/linux-jammy-nvidia-tegra-5.15/:"
+FILESEXTRAPATHS:prepend := "${THISDIR}/linux-noble-nvidia-tegra-6.8/:"
 
 #SRCBRANCH = "tegra-5.10-austin-rebase"
 #SRCREV = "8f3cb4cfc09b761c599580fd8212fc37a9d69550"

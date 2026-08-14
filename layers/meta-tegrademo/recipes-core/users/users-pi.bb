@@ -4,19 +4,25 @@ LICENSE = "MIT"
 LIC_FILES_CHKSUM = "file://${COMMON_LICENSE_DIR}/MIT;md5=0835ade698e0bcf8506ecda2f7b4f302"
 PR = "r0"
 
-DOTFILES_REF="v0.1"
+SRCREV_dotfiles = "fa97e077944d36e320201a2627cc6a75e4f1bceb"
+SRCREV_vundle = "5548a1a937d4e72606520c7484cd384e6c76b565"
+SRCREV_maktaba = "fe95bb10f6bb250943a44632107f6a3d76ce5f28"
+SRCREV_codefmt = "ff464a478202df40ae484e6e94a1d56587fcc69e"
+SRCREV_glaive = "3c5db8d279f86355914200119e8727a085863fcd"
+SRCREV_FORMAT = "dotfiles_vundle_maktaba_codefmt_glaive"
 
-SRCREV="fa97e077944d36e320201a2627cc6a75e4f1bceb"
-SRC_URI:append = " file://home/pi/.ssh/authorized_keys"
-SRC_URI:append = " file://etc/security/limits.d/rt.conf"
-SRC_URI:append = " git://github.com/AustinSchuh/.dotfiles.git;protocol=https;branch=main;name=dotfiles"
-
-do_install[network] = '1'
+SRC_URI = "file://home/pi/.ssh/authorized_keys \
+           file://etc/security/limits.d/rt.conf \
+           git://github.com/AustinSchuh/.dotfiles.git;protocol=https;branch=main;name=dotfiles \
+           git://github.com/VundleVim/Vundle.vim.git;protocol=https;branch=master;name=vundle;destsuffix=vundle \
+           git://github.com/google/vim-maktaba.git;protocol=https;branch=master;name=maktaba;destsuffix=maktaba \
+           git://github.com/google/vim-codefmt.git;protocol=https;branch=master;name=codefmt;destsuffix=codefmt \
+           git://github.com/google/vim-glaive.git;protocol=https;branch=master;name=glaive;destsuffix=glaive \
+           "
 
 PACKAGES =+ "${PN}-pi"
 
-S = "${WORKDIR}/sources"
-UNPACKDIR = "${S}"
+S = "${UNPACKDIR}"
 
 inherit useradd
 
@@ -34,6 +40,15 @@ install_content() {
     chown "$3" "${D}${base_prefix}/$2"
 }
 
+install_vim_plugins() {
+    vim_home="$1"
+    install -d -m0755 "${vim_home}/.vim/bundle"
+    rsync --recursive --exclude '.git' ${UNPACKDIR}/vundle/ "${vim_home}/.vim/bundle/Vundle.vim/"
+    rsync --recursive --exclude '.git' ${UNPACKDIR}/maktaba/ "${vim_home}/.vim/bundle/vim-maktaba/"
+    rsync --recursive --exclude '.git' ${UNPACKDIR}/codefmt/ "${vim_home}/.vim/bundle/vim-codefmt/"
+    rsync --recursive --exclude '.git' ${UNPACKDIR}/glaive/ "${vim_home}/.vim/bundle/vim-glaive/"
+}
+
 do_install() {
     set -x
     mkdir -p -m755 ${D}${base_prefix}/home/pi/.ssh
@@ -44,20 +59,18 @@ do_install() {
 
     # Install dotfiles.
     mkdir -p ${D}${base_prefix}/home/pi/.dotfiles
-    rsync --recursive --verbose --exclude '.git' ${WORKDIR}/sources/git/ ${D}${base_prefix}/home/pi/
+    rsync --recursive --verbose --exclude '.git' ${UNPACKDIR}/${BB_GIT_DEFAULT_DESTSUFFIX}/ ${D}${base_prefix}/home/pi/
     chown -R pi:pi ${D}${base_prefix}/home/pi/
 
     # Now setup vundle for vim.
-    echo "" | HOME=${D}${base_prefix}/home/pi/ /usr/bin/vim -u ${D}${base_prefix}/home/pi/.vimrc -c PluginInstall -c qall | tee /dev/null
-    rm ${D}${base_prefix}/home/pi/.viminfo
+    install_vim_plugins ${D}${base_prefix}/home/pi
     chown -R pi:pi ${D}${base_prefix}/home/pi/
 
     # Do it for root too...
     mkdir -p ${D}${base_prefix}${ROOT_HOME}/.dotfiles
-    rsync --recursive --verbose --exclude '.git' ${WORKDIR}/sources/git/ ${D}${base_prefix}${ROOT_HOME}/
+    rsync --recursive --verbose --exclude '.git' ${UNPACKDIR}/${BB_GIT_DEFAULT_DESTSUFFIX}/ ${D}${base_prefix}${ROOT_HOME}/
     chown -R root:root ${D}${base_prefix}${ROOT_HOME}/
-    echo "" | HOME=${D}${base_prefix}${ROOT_HOME}/ /usr/bin/vim -u ${D}${base_prefix}${ROOT_HOME}/.vimrc -c PluginInstall -c qall | tee /dev/null
-    rm ${D}${base_prefix}${ROOT_HOME}/.viminfo
+    install_vim_plugins ${D}${base_prefix}${ROOT_HOME}
     chown -R root:root ${D}${base_prefix}${ROOT_HOME}
 
 
