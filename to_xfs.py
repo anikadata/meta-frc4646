@@ -4,6 +4,7 @@ import sys
 import contextlib
 import tempfile
 import os
+import glob
 import subprocess
 
 @contextlib.contextmanager
@@ -54,13 +55,40 @@ def make_image(image):
         ],
                        check=True)
 
+def resolve_tegraflash_archive(image):
+    if os.path.exists(image):
+        return image
+
+    suffix = '.rootfs.tegraflash.tar.gz'
+    if not image.endswith(suffix):
+        return image
+
+    dirname = os.path.dirname(image)
+    prefix = os.path.basename(image)[:-len(suffix)]
+    candidates = [
+        os.path.join(dirname, f'{prefix}.tegraflash-tar.zst'),
+        os.path.join(dirname, f'{prefix}.rootfs.tegraflash.tar.zst'),
+    ]
+    for candidate in candidates:
+        if os.path.exists(candidate):
+            print(f'{image} not found; using {candidate}', file=sys.stderr)
+            return candidate
+
+    timestamped = glob.glob(os.path.join(dirname, f'{prefix}.rootfs-*.tegraflash-tar.zst'))
+    if timestamped:
+        candidate = max(timestamped, key=os.path.getmtime)
+        print(f'{image} not found; using {candidate}', file=sys.stderr)
+        return candidate
+
+    return image
+
 if __name__ == '__main__':
     if len(sys.argv) < 3:
         print("Usage:", file=sys.stderr)
         print("  to_xfs ext3.rootfs.tegraflash.tar.gz xfs.rootfs.tegraflash.tar.zstd", file=sys.stderr)
         sys.exit(1)
 
-    EXT3 = sys.argv[1]
+    EXT3 = resolve_tegraflash_archive(sys.argv[1])
     XFS = sys.argv[2]
 
     print(f'Converting {EXT3}(ext3) to {XFS}(xfs)')
