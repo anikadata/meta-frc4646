@@ -7,20 +7,29 @@ Metadata layers are brought in as git submodules:
 
 | Layer Repo            | Branch         | Description                                         |
 | --------------------- | ---------------|---------------------------------------------------- |
-| poky                  | scarthgap      | OE-Core from poky repo at yoctoproject.org          |
-| meta-tegra            | scarthgap      | L4T BSP layer - L4T R36.4.0/JetPack 6.1             |
-| meta-tegra-community  | scarthgap      | OE4T layer with additions from the community        |
-| meta-openembedded     | scarthgap      | OpenEmbedded layers                                 |
-| meta-virtualization   | scarthgap      | Virtualization layer for docker support             |
+| openembedded-core     | wrynose        | OE-Core                                             |
+| bitbake               | 2.18           | BitBake                                             |
+| meta-tegra            | wrynose        | Pinned L4T R39.2.0 / JetPack 7.2                     |
+| meta-tegra-community  | wrynose        | OE4T layer with additions from the community        |
+| meta-openembedded     | wrynose        | OpenEmbedded layers                                 |
+| meta-virtualization   | wrynose        | Virtualization layer                                |
+
+Use the recorded submodule commits, not the moving branch tips:
+
+```
+git submodule update --init --recursive
+```
 
 ## Usage
 
 The upstream project has been modified to support AOS on the Jetson Nano 8GB SOM on a Seeed
-studio J401.  To build, run:
+studio J401. Confirm the carrier and module before selecting a machine;
+`p3768-0000-p3767-0003` describes an 8GB production module on a P3768 carrier.
+Build on Linux with a case-sensitive build filesystem. To build, run:
 
 ```
 export MACHINE=p3768-0000-p3767-0003
-. repos/poky/oe-init-build-env build
+. layers/oe-init-build-env build
 bitbake demo-image-base && ../to_xfs.py tmp/deploy/images/p3768-0000-p3767-0003/demo-image-base-p3768-0000-p3767-0003.rootfs.tegraflash.tar.gz demo-image-base-p3768-0000-p3767-0003.rootfs.tegraflash.tar.zst
 ```
 
@@ -31,7 +40,7 @@ To flash, extract the image, then run `sudo ./initrd-flash` with the orin in boo
 To build for a devkit instead of a seed J401, run:
 ```
 export MACHINE=jetson-orin-nano-devkit-nvme
-. repos/poky/oe-init-build-env build
+. layers/oe-init-build-env build
 bitbake demo-image-base && ../to_xfs.py tmp/deploy/images/jetson-orin-nano-devkit-nvme/demo-image-base-jetson-orin-nano-devkit-nvme.rootfs.tegraflash.tar.gz demo-image-base-jetson-orin-nano-devkit-nvme.rootfs.tegraflash.tar.zst
 ```
 
@@ -42,6 +51,21 @@ To view the serial console:
 ```
 python3 /usr/lib/python3/dist-packages/serial/tools/miniterm.py /dev/ttyUSB0 115200
 ```
+
+# AOS compatibility before flashing
+
+This image pins CUDA 13.2 and OpenCV 4.13. The software branch
+`team1868/software:anikadata/newsysrootwrynose` still selects a Walnascar
+sysroot with CUDA 12.6 and OpenCV 4.11. Export a sysroot from the image,
+migrate the Bazel sysroot/toolchain together, and rebuild the AOS bundle
+before treating this as a compatible pair. Missing `libcudart.so.12` or
+`libopencv_*.so.411` on the Orin indicates this mismatch; reflashing alone
+does not fix it. See `2026/vision/README.md` in the software repository.
+
+The UVC aliases below cover two alternative four-port hub layouts. Use one
+layout at a time and verify `/dev/videoa` through `/dev/videod` against the
+physical camera calibrations. Unknown USB layouts intentionally get no alias;
+capture-device enumeration order is not a stable calibration identifier.
 
 # UVC camera debugging
 
@@ -61,7 +85,13 @@ To turn quirks on to fix bandwidth calcs:
 
 ```
 rmmod uvcvideo
-modprobe uvcvideo quirks=128
+modprobe uvcvideo quirks=128 bandwidth_quirk_divisor=16
 ```
 
 `dmesg` will spit out frame statistics, including bandwidth usage.
+
+The image's `uvc.conf` sets these parameters. The divisor is a camera-specific
+bandwidth workaround, not evidence that four simultaneous streams will fit.
+Check all four streams at the configured resolution and frame rate. The
+divisor is read-only after module load; zero is treated as one to avoid a
+kernel divide-by-zero.

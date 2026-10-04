@@ -129,6 +129,7 @@ RDEPENDS:${PN} = " \
     chronyc \
     kernel-module-uvcvideo \
     kernel-module-usbmon \
+    kernel-module-sctp \
     tshark \
     tegra-bootfiles-dev \
  "
