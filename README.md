@@ -54,13 +54,18 @@ python3 /usr/lib/python3/dist-packages/serial/tools/miniterm.py /dev/ttyUSB0 115
 
 # AOS compatibility before flashing
 
-This image pins CUDA 13.2 and OpenCV 4.13. The software branch
-`team1868/software:anikadata/newsysrootwrynose` still selects a Walnascar
-sysroot with CUDA 12.6 and OpenCV 4.11. Export a sysroot from the image,
-migrate the Bazel sysroot/toolchain together, and rebuild the AOS bundle
-before treating this as a compatible pair. Missing `libcudart.so.12` or
-`libopencv_*.so.411` on the Orin indicates this mismatch; reflashing alone
-does not fix it. See `2026/vision/README.md` in the software repository.
+This image pins CUDA 13.2 and OpenCV 4.13. Local changes on the software
+branch `team1868/software:anikadata/newsysrootwrynose` now select a matching
+Wrynose export instead of Walnascar (CUDA 12.6 / OpenCV 4.11). Install that
+local sysroot and rebuild the AOS bundle; see `tools/wrynose_sysroot/README.md`
+and `2026/vision/README.md` in the software repository. Missing
+`libcudart.so.12` or `libopencv_*.so.411` on the Orin indicates old binaries;
+reflashing alone does not fix them.
+
+The supplied September 23 image still contains the old camera naming rules
+and no SCTP kernel module. Rebuild this layer's image before flashing so it
+includes the reviewed camera, UVC, and SCTP fixes. An exported application
+sysroot does not update those parts of an existing flash archive.
 
 The UVC aliases below cover two alternative four-port hub layouts. Use one
 layout at a time and verify `/dev/videoa` through `/dev/videod` against the
