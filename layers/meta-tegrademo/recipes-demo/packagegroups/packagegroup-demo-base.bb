@@ -102,6 +102,7 @@ RDEPENDS:${PN} = " \
     xfsprogs \
     bridge-utils \
     glibc-utils \
+    ldd \
     localedef \
     libxkbfile \
     autossh \

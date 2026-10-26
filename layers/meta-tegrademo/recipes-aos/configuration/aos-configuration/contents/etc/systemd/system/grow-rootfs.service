@@ -11,7 +11,7 @@ After=systemd-remount-fs.service
 
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c "/sbin/xfs_growfs $(systemctl show --property What --value -- -.mount)"
+ExecStart=/usr/sbin/aos-grow-rootfs
 TimeoutSec=0
 RemainAfterExit=yes
 

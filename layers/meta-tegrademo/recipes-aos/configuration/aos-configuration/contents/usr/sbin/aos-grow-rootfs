@@ -1,0 +1,12 @@
+#!/bin/sh
+# The flash tools expand the partition; grow the filesystem to match it.
+set -eu
+filesystem=$(findmnt -n -o FSTYPE --target /)
+case "$filesystem" in
+    xfs) exec xfs_growfs / ;;
+    ext4)
+        device=$(findmnt -n -o SOURCE --target /)
+        exec resize2fs "$device"
+        ;;
+    *) echo "Unsupported root filesystem: $filesystem" >&2; exit 1 ;;
+esac

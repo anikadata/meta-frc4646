@@ -1,0 +1,21 @@
+#!/bin/bash
+# Usage: tools/build-container/run [command ...]
+# With no command, open a shell; initialize with . layers/oe-init-build-env build.
+set -euo pipefail
+repo=$(cd "$(dirname "$0")/../.." && pwd)
+workspace=$(dirname "$repo")
+image=orin-yocto-builder:local
+docker build --build-arg "BUILD_UID=$(id -u)" \
+  --build-arg "BUILD_GID=$(stat -c %g "$repo")" -t "$image" \
+  "$repo/tools/build-container"
+interactive=()
+if [[ -t 0 && -t 1 ]]; then interactive=(-it); fi
+if [[ $# -eq 0 ]]; then set -- bash; fi
+# BitBake creates user/network namespaces per task. Allow them within this
+# build container without changing the host's global AppArmor settings.
+# Keep Docker's AppArmor profile: unconfined triggers Ubuntu's restriction
+# on unprivileged user namespaces even when seccomp permits them.
+exec docker run --rm "${interactive[@]}" \
+  --security-opt seccomp=unconfined \
+  --mount "type=bind,source=$workspace,target=$workspace" \
+  --workdir "$repo" "$image" "$@"

@@ -2,6 +2,11 @@ build/bitbake*
 build/cache
 build/hashserve*
 build/tmp
+build/downloads/
+build/sstate-cache/
+build/conf/conf-notes.txt
+build/conf/conf-summary.txt
+build/conf/auto.conf
 *~
 *.pyc
 *.pyo
