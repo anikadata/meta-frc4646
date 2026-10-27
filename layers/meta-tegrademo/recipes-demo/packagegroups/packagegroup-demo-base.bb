@@ -131,6 +131,7 @@ RDEPENDS:${PN} = " \
     kernel-module-uvcvideo \
     kernel-module-usbmon \
     kernel-module-sctp \
+    kernel-module-md5 \
     tshark \
     tegra-bootfiles-dev \
  "
