@@ -14,6 +14,9 @@ if [[ ! -x "$flash_dir/initrd-flash" || ! -f "$flash_dir/.env.initrd-flash" ]]; 
 fi
 script_dir=$(cd "$(dirname "$0")" && pwd)
 docker build -t orin-yocto-flasher:local "$script_dir"
+docker run --rm --network=none --cap-drop=ALL --user "$(id -u):$(id -g)" \
+  --mount "type=bind,source=$flash_dir,target=/flash,readonly" \
+  --entrypoint python3 orin-yocto-flasher:local /usr/local/lib/orin-flash-check.py
 # Desktop automount runs in the host's mount namespace, which this container
 # cannot unmount. Suspend this user's GNOME automount only for the flash.
 help_requested=false

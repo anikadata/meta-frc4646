@@ -21,6 +21,7 @@ class FlashResultTest(unittest.TestCase):
         docker = self.root / 'docker'
         docker.write_text('#!/bin/sh\n'
                           '[ "$1" = build ] && exit 0\n'
+                          'case "$*" in *--entrypoint*) exit "${FIXTURE_PREFLIGHT_EXIT:-0}";; esac\n'
                           'cat "$FIXTURE_SETTINGS" > "$FIXTURE_DURING_FLASH"\n'
                           'printf "%s\\n" "$FIXTURE_FLASH_OUTPUT"\n'
                           'exit "$FIXTURE_FLASH_EXIT"\n')
@@ -110,6 +111,11 @@ else:
         import json
         self.assertEqual(self.run_flash('Usage:', 0, '--help').returncode, 0)
         self.assertTrue(json.loads(self.during.read_text())['automount'])
+
+    def test_dependency_failure_prevents_device_access(self):
+        self.extra_env['FIXTURE_PREFLIGHT_EXIT'] = '7'
+        self.assertEqual(self.run_flash('Final status: SUCCESS').returncode, 7)
+        self.assertFalse(self.during.exists())
 
 
 if __name__ == '__main__':

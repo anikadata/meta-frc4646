@@ -79,7 +79,7 @@ reuse previously compiled shared state, start with empty `build/tmp` and
 remain enforced. `INHERIT += "rm_work"` can reduce intermediate disk usage.
 Do not remove another running build's directories.
 
-On a Linux host with Docker access, the flash container supplies Ubuntu 24.04
+On an x86-64 Linux host with Docker access, the flash container supplies Ubuntu 24.04
 and the flashing tools without needing host package installation or host sudo:
 
 ```sh
@@ -94,6 +94,8 @@ device/mount access because Orin recovery exports USB mass-storage devices;
 it has no network access. Only use a trusted flash archive and keep the device
 powered throughout. The script writes boot firmware and the NVMe rootfs.
 Back up target application/configuration files before flashing.
+Before accessing USB, the wrapper checks the archive's actual NVIDIA Python
+imports and x86 helper libraries in an unprivileged container.
 
 Run the wrapper as your normal Docker-enabled user. In a GNOME session it
 temporarily disables that user's media automount and restores both settings
