@@ -101,7 +101,8 @@ For a running NVIDIA developer kit, NVIDIA documents
 Check `lsusb` for NVIDIA APX before flashing. Normal SSH/Ethernet access is
 unavailable in recovery mode. The wrapper records a log in the extracted
 directory and requires `Final status: SUCCESS`, because the upstream helper
-can return zero even when its final device status is `FAILED`. Confirm
+can return zero even when its final device status is `FAILED`. Every reported
+final status must succeed; one success cannot hide another failure. Confirm
 booted-image identity, filesystem growth, and application tests afterward;
 a completed image build alone is insufficient.
 

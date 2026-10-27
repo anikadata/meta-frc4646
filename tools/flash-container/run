@@ -24,11 +24,18 @@ docker run --rm --privileged --network=none \
   --mount type=bind,source=/run/udev,target=/run/udev,readonly \
   orin-yocto-flasher:local "$@" 2>&1 | tee "$status_log"
 # The upstream T234 helper can return zero after printing a FAILED device
-# status. Require the device's explicit success report as well as exit zero.
+# status. Require explicit success and reject every non-success final status,
+# even when another device/session has reported success in the same output.
 for argument in "$@"; do
   if [[ $argument == -h || $argument == --help ]]; then exit 0; fi
 done
-if ! grep -qx 'Final status: SUCCESS' "$status_log"; then
-  echo "Flash did not report device SUCCESS; inspect $status_log and device-logs-*" >&2
+if ! awk '
+  /^Final status: / {
+    seen = 1
+    if ($0 != "Final status: SUCCESS") failed = 1
+  }
+  END { exit (!seen || failed) }
+' "$status_log"; then
+  echo "Flash did not report device SUCCESS for every final status; inspect $status_log and device-logs-*" >&2
   exit 1
 fi

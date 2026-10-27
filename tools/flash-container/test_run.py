@@ -36,6 +36,10 @@ class FlashResultTest(unittest.TestCase):
     def test_explicit_device_success(self):
         self.assertEqual(self.run_flash('Final status: SUCCESS').returncode, 0)
 
+    def test_all_device_statuses_successful(self):
+        self.assertEqual(self.run_flash(
+            'Final status: SUCCESS\nFinal status: SUCCESS').returncode, 0)
+
     def test_zero_exit_device_failure(self):
         result = self.run_flash('Final status: FAILED')
         self.assertNotEqual(result.returncode, 0)
@@ -43,6 +47,18 @@ class FlashResultTest(unittest.TestCase):
 
     def test_missing_device_status(self):
         self.assertNotEqual(self.run_flash('Flash host finished').returncode, 0)
+
+    def test_success_does_not_hide_another_device_failure(self):
+        for lines in (
+            ['Final status: SUCCESS', 'Final status: FAILED'],
+            ['Final status: FAILED', 'Final status: SUCCESS'],
+        ):
+            with self.subTest(lines=lines):
+                self.assertNotEqual(self.run_flash('\n'.join(lines)).returncode, 0)
+
+    def test_unknown_final_status_is_not_success(self):
+        self.assertNotEqual(self.run_flash(
+            'Final status: SUCCESS\nFinal status: UNKNOWN').returncode, 0)
 
     def test_host_error_even_with_success_text(self):
         self.assertEqual(self.run_flash('Final status: SUCCESS', 7).returncode, 7)
