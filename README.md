@@ -114,21 +114,38 @@ final status must succeed; one success cannot hide another failure. Confirm
 booted-image identity, filesystem growth, and application tests afterward;
 a completed image build alone is insufficient.
 
-### Earlier validation (2026-10-26)
+### Validated rebuild (2026-10-27)
 
-The complete `demo-image-base` build for `p3768-0000-p3767-0003` passed all
-11,549 tasks, including image QA. The local artifact is
-`../artifacts/orin-nano-8gb-2026.10.26.tegraflash-tar.zst`; its checksum is in
-`../artifacts/SHA256SUMS`. The archive contains `initrd-flash`, the ext4 image,
-and the SKU 0003 device tree. Its flash configuration checks board 3767 / SKU 0003.
+The initial clean `demo-image-base` build completed all 12,260 tasks with zero
+reused tasks. An actual SCTP listener test then exposed a missing runtime
+crypto module: `sctp` loaded, but its default MD5 cookie authentication failed.
+The corrected package group installs `kernel-module-md5`. Reassembling the
+image from the freshly compiled packages executed 30 tasks and passed image QA.
 
-The assembled image contains the enabled filesystem-growth fix and utilities,
-`ldd`, camera aliases, SCTP, and the UVC bandwidth parameter. The paired AOS
-bundle passed 28 native loader checks and recorded-image MONO8/YUYV CUDA tests
-on the connected Orin. The new image has not been flashed; live camera and
-roboRIO integration remain untested. See `../artifacts/bringup-state.json` and
-the software repository's `tools/wrynose_sysroot/README.md` for validation details.
+Final image source: `71ff641ca882e45d9fa991f388fb465ec02f90fb` and the pinned submodules.
+Final flash archive SHA256:
 
+```text
+0c21e23e35044ffaf7cc9febf3965a4d02e645c589f4b90d86eaebc73eb300e3
+```
+
+This image was flashed to the P3767-0003/P3768 developer kit with explicit
+device `SUCCESS`. Booted system-file hashes, filesystem UUID, and SDK package
+versions matched. The ext4 filesystem grew to about 872 GiB, all six CPU cores
+came online in MAXN_SUPER, and CUDA samples and SCTP data exchange passed.
+
+The paired software branch uses SDK revision `2026.10.27.1`, exported from this
+exact image. A fresh GitHub clone downloaded it and completed 7,175 clean build
+actions. The 68-file deployment passed loader checks, all 19 GPU and 19 NEON
+recorded-image cases, four-channel stress and malformed-JPEG recovery,
+supervised startup, Ethernet Foxglove/NetworkTables, and reboot validation.
+No physical cameras or roboRIO were attached; capture, bandwidth, calibration,
+and real robot integration still require those devices.
+
+Image/SDK assets, test evidence, and the report are in the private software
+repository's [validated release](https://github.com/team1868/software/releases/tag/wrynose-orin-2026.10.27.1).
+Its `tools/wrynose_sysroot/README.md` documents setup on another Linux machine.
+The October 27 diagnostic draft without the MD5 package was superseded.
 
 To view the serial console:
 ```
