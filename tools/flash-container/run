@@ -1,0 +1,34 @@
+#!/bin/bash
+# Usage: tools/flash-container/run /path/to/extracted-flash-archive [initrd-flash options]
+# Writes the connected Jetson's boot firmware and root filesystem.
+set -euo pipefail
+if [[ $# -lt 1 ]]; then
+  echo "Usage: $0 EXTRACTED_FLASH_DIRECTORY [initrd-flash options]" >&2
+  exit 2
+fi
+flash_dir=$(realpath "$1")
+shift
+if [[ ! -x "$flash_dir/initrd-flash" || ! -f "$flash_dir/.env.initrd-flash" ]]; then
+  echo "Not an extracted tegraflash archive: $flash_dir" >&2
+  exit 2
+fi
+script_dir=$(cd "$(dirname "$0")" && pwd)
+docker build -t orin-yocto-flasher:local "$script_dir"
+# T234 recovery exports USB mass-storage devices during flashing. The mount
+# and device operations require privilege; network access is unnecessary.
+# The upstream helper matches storage by the recovery session/vendor IDs.
+status_log=$(mktemp "$flash_dir/flash-container.XXXXXXXX.log")
+docker run --rm --privileged --network=none \
+  --mount "type=bind,source=$flash_dir,target=/flash" \
+  --mount type=bind,source=/dev,target=/dev \
+  --mount type=bind,source=/run/udev,target=/run/udev,readonly \
+  orin-yocto-flasher:local "$@" 2>&1 | tee "$status_log"
+# The upstream T234 helper can return zero after printing a FAILED device
+# status. Require the device's explicit success report as well as exit zero.
+for argument in "$@"; do
+  if [[ $argument == -h || $argument == --help ]]; then exit 0; fi
+done
+if ! grep -qx 'Final status: SUCCESS' "$status_log"; then
+  echo "Flash did not report device SUCCESS; inspect $status_log and device-logs-*" >&2
+  exit 1
+fi

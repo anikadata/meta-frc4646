@@ -70,7 +70,42 @@ To flash, extract the archive, then run `sudo ./initrd-flash` with the Orin in
 recovery mode and connected over USB. Flashing replaces the target system;
 building the archive does not flash the connected device.
 
-### Local validation (2026-10-26)
+### Clean rebuild and containerized flash
+
+A fresh recursive clone supplies all pinned layers. For a build that does not
+reuse previously compiled shared state, start with empty `build/tmp` and
+`build/sstate-cache` directories and set `SSTATE_MIRRORS = ""` in
+`build/conf/auto.conf`. Downloaded source archives may be reused; their checksums
+remain enforced. `INHERIT += "rm_work"` can reduce intermediate disk usage.
+Do not remove another running build's directories.
+
+On a Linux host with Docker access, the flash container supplies Ubuntu 24.04
+and the flashing tools without needing host package installation or host sudo:
+
+```sh
+mkdir -p /path/to/new-flash-directory
+tar --zstd -xf /path/to/image.tegraflash-tar.zst -C /path/to/new-flash-directory
+# With the intended Orin connected by USB-C and already in recovery mode:
+tools/flash-container/run /path/to/new-flash-directory --usb-instance 3-3
+```
+
+Replace `3-3` with the actual USB bus/port path. The container uses privileged
+device/mount access because Orin recovery exports USB mass-storage devices;
+it has no network access. Only use a trusted flash archive and keep the device
+powered throughout. The script writes boot firmware and the NVMe rootfs.
+Back up target application/configuration files before flashing.
+
+For a running NVIDIA developer kit, NVIDIA documents
+`sudo reboot --force forced-recovery` as the
+[software recovery entry command](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/howto.html#force-recovery-mode).
+Check `lsusb` for NVIDIA APX before flashing. Normal SSH/Ethernet access is
+unavailable in recovery mode. The wrapper records a log in the extracted
+directory and requires `Final status: SUCCESS`, because the upstream helper
+can return zero even when its final device status is `FAILED`. Confirm
+booted-image identity, filesystem growth, and application tests afterward;
+a completed image build alone is insufficient.
+
+### Earlier validation (2026-10-26)
 
 The complete `demo-image-base` build for `p3768-0000-p3767-0003` passed all
 11,549 tasks, including image QA. The local artifact is
@@ -96,10 +131,18 @@ python3 /usr/lib/python3/dist-packages/serial/tools/miniterm.py /dev/ttyUSB0 115
 This image pins CUDA 13.2 and OpenCV 4.13. The paired software branch
 `team1868/software:anikadata/newsysrootwrynose` selects a matching
 Wrynose export instead of Walnascar (CUDA 12.6 / OpenCV 4.11). Install that
-local sysroot and rebuild the AOS bundle; see `tools/wrynose_sysroot/README.md`
+sysroot and rebuild the AOS bundle; see `tools/wrynose_sysroot/README.md`
 and `2026/vision/README.md` in the software repository. Missing
 `libcudart.so.12` or `libopencv_*.so.411` on the Orin indicates old binaries;
 reflashing alone does not fix them.
+
+The software branch's `tools/build_orin` installs its checksum-pinned sysroot
+from that private repository's release assets and builds the correct
+`//2026/vision:download` target. A Git checkout does not itself contain the large
+headers/libraries archive. The software repository also includes an unprivileged
+Ubuntu container exporter for this image's ext4 rootfs; see
+`tools/export_wrynose_sysroot.py`. Regenerate and publish matching sysroot
+metadata/assets when changing target runtime libraries.
 
 The supplied September 23 image still contains the old camera naming rules
 and no SCTP kernel module. Rebuild this layer's image before flashing so it
