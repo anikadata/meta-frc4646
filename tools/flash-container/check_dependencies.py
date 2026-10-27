@@ -5,7 +5,7 @@ import struct
 import subprocess
 import sys
 
-for program in ('dtc', 'xmllint', 'bmaptool', 'cpio', 'sgdisk', 'parted',
+for program in ('cpp', 'dtc', 'fdtoverlay', 'lz4c', 'dd', 'xmllint', 'bmaptool', 'cpio', 'sgdisk', 'parted',
                 'mount', 'umount', 'mkfs.vfat', 'openssl'):
     if not shutil.which(program):
         raise SystemExit(f'Missing flash host command: {program}')
