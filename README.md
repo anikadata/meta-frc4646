@@ -95,6 +95,12 @@ it has no network access. Only use a trusted flash archive and keep the device
 powered throughout. The script writes boot firmware and the NVMe rootfs.
 Back up target application/configuration files before flashing.
 
+Run the wrapper as your normal Docker-enabled user. In a GNOME session it
+temporarily disables that user's media automount and restores both settings
+on exit, including failures. On other desktops, disable their removable-media
+automount for the flash; a host desktop mount is invisible to the container.
+Avoid another logged-in desktop session automounting the same device.
+
 For a running NVIDIA developer kit, NVIDIA documents
 `sudo reboot --force forced-recovery` as the
 [software recovery entry command](https://docs.nvidia.com/jetson/orin-nano-devkit/user-guide/latest/howto.html#force-recovery-mode).

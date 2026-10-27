@@ -14,6 +14,44 @@ if [[ ! -x "$flash_dir/initrd-flash" || ! -f "$flash_dir/.env.initrd-flash" ]]; 
 fi
 script_dir=$(cd "$(dirname "$0")" && pwd)
 docker build -t orin-yocto-flasher:local "$script_dir"
+# Desktop automount runs in the host's mount namespace, which this container
+# cannot unmount. Suspend this user's GNOME automount only for the flash.
+help_requested=false
+for argument in "$@"; do
+  if [[ $argument == -h || $argument == --help ]]; then help_requested=true; fi
+done
+media_schema=org.gnome.desktop.media-handling
+media_keys=()
+media_values=()
+restore_automount() {
+  local result=$? index
+  for index in "${!media_keys[@]}"; do
+    if ! gsettings set "$media_schema" "${media_keys[index]}" "${media_values[index]}"; then
+      echo "Could not restore GNOME ${media_keys[index]}=${media_values[index]}" >&2
+      if [[ $result == 0 ]]; then result=1; fi
+    fi
+  done
+  exit "$result"
+}
+trap restore_automount EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+if ! "$help_requested" && [[ -n ${DBUS_SESSION_BUS_ADDRESS:-} ]] && command -v gsettings >/dev/null; then
+  # A session without this schema is not a GNOME desktop.
+  if gsettings get "$media_schema" automount >/dev/null 2>&1; then
+    for key in automount automount-open; do
+      original=$(gsettings get "$media_schema" "$key")
+      media_keys+=("$key")
+      media_values+=("$original")
+      gsettings set "$media_schema" "$key" false
+      if [[ $(gsettings get "$media_schema" "$key") != false ]]; then
+        echo "Could not suspend GNOME $key; stop desktop automount before flashing." >&2
+        exit 1
+      fi
+    done
+    echo "GNOME automount suspended until the flash exits."
+  fi
+fi
 # T234 recovery exports USB mass-storage devices during flashing. The mount
 # and device operations require privilege; network access is unnecessary.
 # The upstream helper matches storage by the recovery session/vendor IDs.
@@ -26,9 +64,7 @@ docker run --rm --privileged --network=none \
 # The upstream T234 helper can return zero after printing a FAILED device
 # status. Require explicit success and reject every non-success final status,
 # even when another device/session has reported success in the same output.
-for argument in "$@"; do
-  if [[ $argument == -h || $argument == --help ]]; then exit 0; fi
-done
+if "$help_requested"; then exit 0; fi
 if ! awk '
   /^Final status: / {
     seen = 1

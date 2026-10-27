@@ -21,9 +21,28 @@ class FlashResultTest(unittest.TestCase):
         docker = self.root / 'docker'
         docker.write_text('#!/bin/sh\n'
                           '[ "$1" = build ] && exit 0\n'
+                          'cat "$FIXTURE_SETTINGS" > "$FIXTURE_DURING_FLASH"\n'
                           'printf "%s\\n" "$FIXTURE_FLASH_OUTPUT"\n'
                           'exit "$FIXTURE_FLASH_EXIT"\n')
         docker.chmod(0o755)
+        self.settings = self.root / 'settings.json'
+        self.settings.write_text('{"automount": true, "automount-open": false}')
+        self.during = self.root / 'during.json'
+        gsettings = self.root / 'gsettings'
+        gsettings.write_text('''#!/usr/bin/env python3
+import json, os, pathlib, sys
+path = pathlib.Path(os.environ['FIXTURE_SETTINGS'])
+settings = json.loads(path.read_text())
+action, schema, key, *value = sys.argv[1:]
+if action == 'get':
+    print(str(settings[key]).lower())
+else:
+    if not os.environ.get('FIXTURE_SETTINGS_LOCKED'):
+        settings[key] = value[0] == 'true'
+        path.write_text(json.dumps(settings))
+''')
+        gsettings.chmod(0o755)
+        self.extra_env = {}
 
     def run_flash(self, output, exit_code=0, *args):
         return subprocess.run([
@@ -31,6 +50,9 @@ class FlashResultTest(unittest.TestCase):
         ], capture_output=True, text=True, env={
             **os.environ, 'PATH': str(self.root) + ':' + os.environ['PATH'],
             'FIXTURE_FLASH_OUTPUT': output, 'FIXTURE_FLASH_EXIT': str(exit_code),
+            'DBUS_SESSION_BUS_ADDRESS': 'fixture',
+            'FIXTURE_SETTINGS': str(self.settings),
+            'FIXTURE_DURING_FLASH': str(self.during), **self.extra_env,
         })
 
     def test_explicit_device_success(self):
@@ -65,6 +87,29 @@ class FlashResultTest(unittest.TestCase):
 
     def test_help_needs_no_device_status(self):
         self.assertEqual(self.run_flash('Usage:', 0, '--help').returncode, 0)
+
+    def test_desktop_automount_suspended_and_original_values_restored(self):
+        import json
+        self.assertEqual(self.run_flash('Final status: SUCCESS').returncode, 0)
+        self.assertEqual(json.loads(self.during.read_text()),
+                         {'automount': False, 'automount-open': False})
+        self.assertEqual(json.loads(self.settings.read_text()),
+                         {'automount': True, 'automount-open': False})
+
+    def test_automount_restored_after_host_failure(self):
+        import json
+        self.assertEqual(self.run_flash('Host error', 7).returncode, 7)
+        self.assertTrue(json.loads(self.settings.read_text())['automount'])
+
+    def test_locked_automount_prevents_flash(self):
+        self.extra_env['FIXTURE_SETTINGS_LOCKED'] = '1'
+        self.assertNotEqual(self.run_flash('Final status: SUCCESS').returncode, 0)
+        self.assertFalse(self.during.exists())
+
+    def test_help_does_not_change_desktop_settings(self):
+        import json
+        self.assertEqual(self.run_flash('Usage:', 0, '--help').returncode, 0)
+        self.assertTrue(json.loads(self.during.read_text())['automount'])
 
 
 if __name__ == '__main__':
