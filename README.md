@@ -194,17 +194,52 @@ Set it back to 0 to turn it off.
 echo 0 | sudo tee /sys/module/uvcvideo/parameters/trace
 ```
 
-To turn quirks on to fix bandwidth calcs:
+After stopping camera applications, reload UVC with the default full bandwidth:
 
 ```
-rmmod uvcvideo
-modprobe uvcvideo quirks=128 bandwidth_quirk_divisor=16
+sudo modprobe -r uvcvideo
+sudo modprobe uvcvideo quirks=128 bandwidth_quirk_divisor=1
 ```
 
 `dmesg` will spit out frame statistics, including bandwidth usage.
 
-The image's `uvc.conf` sets these parameters. The divisor is a camera-specific
-bandwidth workaround, not evidence that four simultaneous streams will fit.
-Check all four streams at the configured resolution and frame rate. The
-divisor is read-only after module load; zero is treated as one to avoid a
-kernel divide-by-zero.
+The image's `uvc.conf` sets these parameters. The October 27 image used divisor
+16, which stalled the physical SPCA2630 camera after it negotiated 1600x1304
+MJPEG at 60 fps. A controlled comparison reproduced zero frames with divisor
+16 and continuous capture with divisor 1, followed by live AOS decoding and
+Foxglove transport. The default now preserves the advertised bandwidth.
+
+Existing October 27 images need the updated `uvc.conf` copied to
+`/etc/modprobe.d/uvc.conf`, followed by the reload above or a reboot. An AOS
+application deployment does not update this OS configuration. The SDK and
+application ABI are unchanged; no sysroot re-export is needed for this fix.
+
+From this checkout on the development host (adjust the target address if needed):
+
+```sh
+scp layers/meta-tegrademo/recipes-aos/configuration/aos-configuration/contents/etc/modprobe.d/uvc.conf \
+  pi@10.18.68.101:/home/pi/uvc.conf
+ssh pi@10.18.68.101
+```
+
+Then on the Orin, stop any bench capture as well as the production service:
+
+```sh
+sudo systemctl stop aos.service
+sudo cp -a --no-clobber /etc/modprobe.d/uvc.conf /etc/modprobe.d/uvc.conf.before-camera-fix
+sudo install -m 0644 /home/pi/uvc.conf /etc/modprobe.d/uvc.conf
+sudo modprobe -r uvcvideo
+sudo modprobe uvcvideo
+cat /sys/module/uvcvideo/parameters/bandwidth_quirk_divisor
+```
+
+The final command must print `1`. If the module is busy, stop the remaining
+camera applications before retrying, or reboot after installing the file.
+Restart production AOS only once its actual robot profile and calibration are
+configured. The software repository's `tools/orin_pipeline_smoke/README.md`
+describes an isolated live-camera test that does not require that configuration.
+
+A bandwidth reduction is a camera-specific workaround and needs validation
+with the actual camera set and mode. Serial tests of all four ports do not
+establish four simultaneous streams. The divisor is read-only after module
+load; zero is treated as one to avoid a kernel divide-by-zero.
